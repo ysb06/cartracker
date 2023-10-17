@@ -1,0 +1,3 @@
+[submodule "ffmpeg-python"]
+	path = ffmpeg-python
+	url = https://github.com/kkroening/ffmpeg-python
