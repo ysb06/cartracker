@@ -1,142 +1,102 @@
-import json
 import logging
 import os
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 import cv2
-import numpy as np
 from torch.utils.data import Dataset
-import yaml
+import numpy as np
 
-from cartracker.dataset.label_studio import (
-    LSCFLabels,
-    KeyFrameLabel,
-    BoundingBox,
-)
+from cartracker.dataset.label_studio import Frame, KeyFrame, LSCFLabels, BoundingBox
 from cartracker.util import load_config
-
 
 logger = logging.getLogger()
 
 
-class Box:
+class RegionOfInterest:
     def __init__(
         self,
-        point_1: Tuple[float, float],
-        point_2: Optional[Tuple[float, float]] = None,
-        width: Optional[float] = None,
-        height: Optional[float] = None,
+        raw_image: np.ndarray,
+        bounding_box: BoundingBox,
         cv_options: Dict[str, Any] = {"color": (0, 0, 255), "thickness": 1},
     ) -> None:
-        self.x1, self.y1 = point_1
-        self.x2, self.y2 = point_1
-        if point_2 is not None:
-            self.x2, self.y2 = point_2
-        elif width is not None and height is not None:
-            self.x2 += width
-            self.y2 += height
-        else:
-            raise TypeError(
-                "Pass arguments only with pair of points or width and height"
-            )
-        self.cv_rect_options = cv_options
+        self.raw_image = raw_image
+        self.bounding_box = bounding_box
+        bounding_box.cv_rect_options = cv_options
 
-    def get_cv_rect(self, width: Union[int, float], height: Union[int, float]):
+        self.point_1 = (
+            round(bounding_box.x1 / 100 * self.raw_image.shape[1]),
+            round(bounding_box.y1 / 100 * self.raw_image.shape[0]),
+        )
+        self.point_2 = (
+            round(bounding_box.x2 / 100 * self.raw_image.shape[1]),
+            round(bounding_box.y2 / 100 * self.raw_image.shape[0]),
+        )
+
+    def get_cv_rect(self):
         rect = {
-            "pt1": (round(self.x1 / 100 * width), round(self.y1 / 100 * height)),
-            "pt2": (round(self.x2 / 100 * width), round(self.y2 / 100 * height)),
-            **self.cv_rect_options,
+            "pt1": self.point_1,
+            "pt2": self.point_2,
+            **self.bounding_box.cv_rect_options,
         }
         return rect
 
-    def __repr__(self) -> str:
-        return self.get_cv_rect(1, 1)
+    def get_croped_image(self):
+        return self.raw_image[
+            self.point_1[1] : self.point_2[1], self.point_1[0] : self.point_2[0]
+        ]
 
 
-@dataclass
-class KeyFrame:
-    frame: int
-    time: float
-    enabled: bool
-    x: float
-    y: float
-    width: float
-    height: float
-    rotation: float
-    info: Optional[Dict[str, Any]] = None
-
-
-@dataclass
-class Frame:
-    start_keyframe: KeyFrame
-    end_keyframe: KeyFrame
-    frame_number: int
-
-    def __repr__(self) -> str:
-        return f"Frame[{self.start_keyframe.info['label_name']}] ({self.frame_number}/{self.start_keyframe.info['frame_count']}) of Task[{self.task_id}]"
+class VideoLoader:
+    def __init__(
+        self,
+        root_path: str,
+        filenames_with_id: Dict[int, str],
+        fixed_video_size: Optional[Tuple[int, int]] = None,
+    ) -> None:
+        self.root_path = root_path
+        self.filename_dict = filenames_with_id
+        self.current_id = -1
+        self.current_video_capture: Optional[cv2.VideoCapture] = None
+        self.__video_size = None if fixed_video_size is None else fixed_video_size
 
     @property
-    def task_id(self) -> int:
-        if self.start_keyframe.info["task_id"] != self.end_keyframe.info["task_id"]:
-            logger.warning(
-                f"The data is invalid: {self.start_keyframe.info['task_id']} != {self.end_keyframe['task_id']}"
-            )
-        return self.start_keyframe.info["task_id"]
+    def video_size(self):
+        # 무조건 get_frame 이후에 불러와야 한다는 점이 문제. 본 기능을 get_frame에 포함하든지, 다른 설계방안을 찾을 것.
+        if self.__video_size is not None:
+            return self.__video_size
+        elif self.current_video_capture is not None:
+            width = self.current_video_capture.get(cv2.CAP_PROP_FRAME_WIDTH)
+            height = self.current_video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
+            return (width, height)
+        else:
+            logger.warning("Nothing is specified for this video loader")
+            return None
 
-    @property
-    def total_frame(self) -> int:
-        if (
-            self.start_keyframe.info["frame_count"]
-            != self.end_keyframe.info["frame_count"]
-        ):
-            logger.warning(
-                f"The data is invalid: {self.start_keyframe.info['frame_count']} != {self.end_keyframe['frame_count']}"
-            )
-        return self.start_keyframe.info["frame_count"]
+    def get_frame(self, id: int, frame_number: int):
+        if id != self.current_id:
+            self.current_id = id
+            video_file_name = self.filename_dict[id]
+            video_file_path = os.path.join(self.root_path, video_file_name)
+            self.current_video_capture = cv2.VideoCapture(video_file_path)
 
-    @property
-    def moving_ratio(self) -> float:
-        return (self.frame_number - self.start_keyframe.frame) / (self.end_keyframe.frame - self.start_keyframe.frame)
+        self.current_video_capture.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
+        _, frame = self.current_video_capture.read()
 
-    @property
-    def label_box(self) -> Box:
-        x1 = (
-            self.start_keyframe.x
-            + (self.end_keyframe.x - self.start_keyframe.x) * self.moving_ratio
-        )
-        y1 = (
-            self.start_keyframe.y
-            + (self.end_keyframe.y - self.start_keyframe.y) * self.moving_ratio
-        )
-        width = (
-            self.start_keyframe.width
-            + (self.end_keyframe.width - self.start_keyframe.width) * self.moving_ratio
-        )
-        height = (
-            self.start_keyframe.height
-            + (self.end_keyframe.height - self.start_keyframe.height)
-            * self.moving_ratio
-        )
-        return Box((x1, y1), width=width, height=height)
+        return frame
 
 
 class SongdoDataset(Dataset):
     def __init__(self, path: str, data_size: int = 0) -> None:
         self.dataset_path = path
         self.label_info = load_config(os.path.join(path, "info.yaml"))
-        self.raw_label = LSCFLabels(
-            os.path.join(path, self.label_info["label_file_name"])
+        label_file_path = os.path.join(path, self.label_info["label_file_name"])
+        self.raw_label = LSCFLabels(label_file_path)
+        self.video_loader = VideoLoader(
+            path,
+            self.label_info["task_related_video_filename_list"],
         )
+
         self.keyframe_data = self.initialize_data()
-        self.debug = True
-
-        self.__current_task_id: int = -1
-        self.__current_video_capture: Optional[cv2.VideoCapture] = None
-        self.__current_video_width = 0
-        self.__current_video_height = 0
-
-        self.__cursor = -1
 
     def initialize_data(self) -> List[Frame]:
         data = []
@@ -159,7 +119,6 @@ class SongdoDataset(Dataset):
                 current_keyframe = KeyFrame(**res, info=current_info)
                 prev_keyframe = current_keyframe
                 prev_keyframe_num = label_idx[3]
-
                 # 귀찮아서지만 의도적으로 마지막 키프레임은 처리하지 않았음.
             else:
                 if label_idx[3] != prev_keyframe_num + 1:
@@ -173,180 +132,16 @@ class SongdoDataset(Dataset):
 
                 prev_keyframe = current_keyframe
                 prev_keyframe_num = label_idx[3]
-
+        # 어떻게 효율적으로 무결성 있게 작성할지는 고민해 보자
         return data
 
     def __len__(self):
         return len(self.keyframe_data)
 
-    def __iter__(self):
-        self.__cursor = -1
-        return self
-
-    def __next__(self) -> Tuple[Frame, Dict[str, Any], List[List[float]]]:
-        self.__cursor += 1
-        return self.__getitem__(self.__cursor)
-
-    def __getitem__(
-        self, index: int
-    ) -> Tuple[Frame, Dict[str, Any], List[List[float]]]:
+    def __getitem__(self, index: int) -> Tuple[RegionOfInterest, np.ndarray]:
         item = self.keyframe_data[index]
-        if item.task_id != self.__current_task_id:
-            self.__current_task_id = item.task_id
-            video_file_name = self.label_info["task_related_video_filename_list"][
-                self.__current_task_id
-            ]
-            self.__current_video_capture = cv2.VideoCapture(
-                os.path.join(self.dataset_path, video_file_name)
-            )
-            self.__current_video_width = self.__current_video_capture.get(
-                cv2.CAP_PROP_FRAME_WIDTH
-            )
-            self.__current_video_height = self.__current_video_capture.get(
-                cv2.CAP_PROP_FRAME_HEIGHT
-            )
+        frame = self.video_loader.get_frame(item.task_id, item.frame_number)
+        item_rect = RegionOfInterest(frame, item.label_box)
+        # 주의: get_cv_rect는 get_frame후에 불려져야 함.
 
-        item_rect = item.label_box.get_cv_rect(
-            self.__current_video_width, self.__current_video_height
-        )
-
-        self.__current_video_capture.set(cv2.CAP_PROP_POS_FRAMES, item.frame_number)
-        _, frame = self.__current_video_capture.read()
-
-        return item, item_rect, frame
-
-
-class Generator:
-    def __init__(self, config: Dict[str, Any]) -> None:
-        self.config = config
-        self.label_raw: Optional[List[Dict]] = None
-        with open(config["data_path"]["label"]) as f:
-            self.label_raw = json.load(f)
-        self.video_file_folder_path = self.config["data_path"]["video"]
-        self.video_width = 0
-        self.video_height = 0
-
-    def generate(self):
-        logger.info("Generation Start")
-        video_file_names = [file for file in os.listdir(self.video_file_folder_path)]
-
-        if self.label_raw is not None:
-            for idx, task in enumerate(self.label_raw):
-                logger.info(
-                    f"Processing Task [{task['id']} ({idx + 1}/{len(self.label_raw)})]"
-                )
-                self.process_task(task, video_file_names)
-
-    def process_task(self, task: Dict, video_file_names: List[str]) -> bool:
-        file_name: str = task["file_upload"].split("-")[1]
-        if file_name not in video_file_names:
-            logger.warning(f"{file_name} video not found. Skipping this task...")
-            return
-
-        file_path = os.path.join(self.video_file_folder_path, file_name)
-        video_capture = cv2.VideoCapture(file_path)
-        self.video_width = video_capture.get(cv2.CAP_PROP_FRAME_WIDTH)
-        self.video_height = video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
-
-        for idx, annotation in enumerate(task["annotations"]):
-            logger.info(
-                f"Processing Annotation [{annotation['id']} ({idx + 1}/{len(task['annotations'])})]"
-            )
-            self.process_annotation(annotation, video_capture)
-
-        # Task 완료
-        video_capture.release()
-
-    def process_annotation(self, annotation: Dict, video_capture: cv2.VideoCapture):
-        for idx, result in enumerate(annotation["result"]):
-            logger.info(
-                f"Processing Result [{result['id']} ({idx + 1}/{len(annotation['result'])})]"
-            )
-            self.process_result(result, video_capture)
-
-    def process_result(self, result: Dict, video_capture: cv2.VideoCapture):
-        value = result["value"]
-
-        label_frame_count = value["framesCount"]
-        capture_frame_count = round(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
-        capture_fps = video_capture.get(cv2.CAP_PROP_FPS)
-        label_mspf = round(value["duration"] / label_frame_count * 1000)
-        capture_mspf = round(1 / capture_fps * 1000)
-
-        if label_frame_count != capture_frame_count:
-            logger.warning(
-                f"The frame count in label({label_frame_count}) and video({capture_frame_count}) does not match."
-            )
-
-        if label_mspf != capture_mspf:
-            logger.warning(
-                f"The MSPF does not match (Label[{label_mspf}] <==> Video[{capture_mspf}])"
-            )
-
-        prev_frame: Optional[KeyFrameLabel] = None
-        for idx, current_frame_raw in enumerate(value["sequence"]):
-            current_frame = KeyFrameLabel(**current_frame_raw)
-            current_frame.id = idx
-            current_frame.capture = video_capture
-
-            if prev_frame is not None:
-                self.process_label(prev_frame, current_frame)
-
-            prev_frame = current_frame
-
-    def process_label(
-        self, prev_frame: KeyFrameLabel, current_frame: KeyFrameLabel, mspf: int = 1
-    ):
-        if prev_frame.capture is not None and current_frame.capture is not None:
-            video_capture = prev_frame.capture  # VideoCapture 무결성 확인 절차가 없음. 주의할 것.
-
-            frame_count_in_label = current_frame.frame - prev_frame.frame
-            for frame_idx, frame_num in enumerate(
-                range(prev_frame.frame, current_frame.frame)
-            ):
-                video_capture.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
-                ret, frame = video_capture.read()  # 시간 오래 걸림
-                rect = self.calculate_rect(
-                    frame_idx, frame_count_in_label, prev_frame, current_frame
-                )
-                frame = self.process_frame(frame, rect)
-
-                if ret:
-                    cv2.imshow("Frame Show", frame)
-                    if frame_idx == 0:
-                        if cv2.waitKey(1) == 27:
-                            break
-                    else:
-                        if cv2.waitKey(mspf) == 27:
-                            break
-                else:
-                    logger.warning(f"No frame for number {frame_num}")
-        else:
-            raise Exception("VideoCapture is None")
-
-    def process_frame(self, frame: np.ndarray, rect: BoundingBox):
-        cv2.rectangle(frame, **rect.get_cv_rect())
-        # 이미지 추출 및 레이블
-        return frame
-
-    def calculate_rect(
-        self,
-        current_frame_idx: int,
-        total_frame_count: int,
-        label_1: KeyFrameLabel,
-        label_2: KeyFrameLabel,
-    ) -> BoundingBox:
-        ratio = current_frame_idx / total_frame_count
-        x1 = label_1.x + (label_2.x - label_1.x) * ratio
-        y1 = label_1.y + (label_2.y - label_1.y) * ratio
-        width = label_1.width + (label_2.width - label_1.width) * ratio
-        height = label_1.height + (label_2.height - label_1.height) * ratio
-        return BoundingBox(
-            x1 * self.video_width / 100,
-            y1 * self.video_height / 100,
-            width=width * self.video_width / 100,
-            height=height * self.video_height / 100,
-        )
-
-    def convert_annotations(self, annotation_results: List[Dict[str, Any]]):
-        pass
+        return item_rect, frame

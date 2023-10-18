@@ -3,45 +3,38 @@ from dataclasses import dataclass
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 import collections
 import cv2
+import logging
+
+import numpy as np
+
+logger = logging.getLogger()
 
 
 class BoundingBox:
     def __init__(
         self,
-        x1: float,
-        y1: float,
-        x2: Optional[float] = None,
-        y2: Optional[float] = None,
+        point_1: Tuple[float, float],
+        point_2: Optional[Tuple[float, float]] = None,
         width: Optional[float] = None,
         height: Optional[float] = None,
-        color: Tuple[int, int, int] = (0, 0, 255),
-        thickness: float = 1,
+        cv_options: Dict[str, Any] = {},
     ) -> None:
-        self.x1 = x1
-        self.y1 = y1
-        self.x2 = x1
-        self.y2 = y1
-        if x2 is not None and y2 is not None:
-            self.x2 = x2
-            self.y2 = y2
+        self.x1, self.y1 = point_1
+        self.x2, self.y2 = point_1
+        if point_2 is not None:
+            self.x2, self.y2 = point_2
         elif width is not None and height is not None:
             self.x2 += width
             self.y2 += height
-
-        self.color = color
-        self.thickness = thickness
-
-    def get_cv_rect(self):
-        return {
-            "pt1": (round(self.x1), round(self.y1)),
-            "pt2": (round(self.x2), round(self.y2)),
-            "color": self.color,
-            "thickness": self.thickness,
-        }
+        else:
+            raise TypeError(
+                "Pass arguments only with pair of points or width and height"
+            )
+        self.cv_rect_options = cv_options
 
 
 @dataclass
-class KeyFrameLabel:
+class KeyFrame:
     frame: int
     time: float
     enabled: bool
@@ -50,8 +43,58 @@ class KeyFrameLabel:
     width: float
     height: float
     rotation: float
-    id: int = -1
-    capture: Optional[cv2.VideoCapture] = None
+    info: Optional[Dict[str, Any]] = None
+
+
+@dataclass
+class Frame:
+    start_keyframe: KeyFrame
+    end_keyframe: KeyFrame
+    frame_number: int
+
+    def __repr__(self) -> str:
+        return f"Frame[{self.start_keyframe.info['label_name']}] ({self.frame_number}/{self.start_keyframe.info['frame_count']}) of Task[{self.task_id}]"
+
+    @property
+    def task_id(self) -> int:
+        if self.start_keyframe.info["task_id"] != self.end_keyframe.info["task_id"]:
+            logger.warning(
+                f"The data is invalid: {self.start_keyframe.info['task_id']} != {self.end_keyframe['task_id']}"
+            )
+        return self.start_keyframe.info["task_id"]
+
+    @property
+    def total_frame(self) -> int:
+        if (
+            self.start_keyframe.info["frame_count"]
+            != self.end_keyframe.info["frame_count"]
+        ):
+            logger.warning(
+                f"The data is invalid: {self.start_keyframe.info['frame_count']} != {self.end_keyframe['frame_count']}"
+            )
+        return self.start_keyframe.info["frame_count"]
+
+    @property
+    def moving_ratio(self) -> float:
+        return (self.frame_number - self.start_keyframe.frame) / (
+            self.end_keyframe.frame - self.start_keyframe.frame
+        )
+
+    @property
+    def label_box(self) -> BoundingBox:
+        ratio = self.moving_ratio
+
+        x_move = (self.end_keyframe.x - self.start_keyframe.x) * ratio
+        y_move = (self.end_keyframe.y - self.start_keyframe.y) * ratio
+        width_change = (self.end_keyframe.width - self.start_keyframe.width) * ratio
+        height_change = (self.end_keyframe.height - self.start_keyframe.height) * ratio
+
+        x1 = self.start_keyframe.x + x_move
+        y1 = self.start_keyframe.y + y_move
+        width = self.start_keyframe.width + width_change
+        height = self.start_keyframe.height + height_change
+
+        return BoundingBox((x1, y1), width=width, height=height)
 
 
 @dataclass
@@ -101,10 +144,7 @@ class NestedIterator:
                 check_key = check_key[0]
 
             # Otherwise, dive deeper if possible
-            if (
-                element.depth < len(self.keys)
-                and check_key in current_item
-            ):
+            if element.depth < len(self.keys) and check_key in current_item:
                 next_key = self.keys[element.depth]
                 next_item = current_item
                 if type(next_key) is not str:
@@ -117,13 +157,7 @@ class NestedIterator:
                 info = [item for item in infos]
                 info.append(current_item)
                 self.stack.append(
-                    LabelElement(
-                        next_item,
-                        info,
-                        current_indices,
-                        element.depth + 1,
-                        0
-                    )
+                    LabelElement(next_item, info, current_indices, element.depth + 1, 0)
                 )
 
         raise StopIteration
@@ -141,8 +175,7 @@ class LSCFLabels:
     def __iter__(self) -> NestedIterator:
         self.iterator = NestedIterator(self.raw, self.keys)
         return self
-    
+
     def __next__(self):
         item, infos, indices = self.iterator.__next__()
         return item, infos, indices
-
