@@ -10,7 +10,7 @@
             "request": "launch",
             "module": "cartracker",
             "console": "integratedTerminal",
-            "justMyCode": true
+            "justMyCode": false
         },
         {
             "name": "Python: Current File",

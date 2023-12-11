@@ -1,0 +1,12 @@
+mode: trainer
+
+trainer:
+  name: yolo_vgg_trainer
+  
+ros:
+  name: simulation
+  package: ros
+  data_path:
+    bags: /Users/sbyim/Workspace/Python/sck-sandbox/pycartracker/data/bags
+    cctv: /Users/sbyim/Workspace/Python/sck-sandbox/pycartracker/data/cctv/cctv_positions.xlsx
+    videos: /Users/sbyim/Workspace/Python/sck-cartracker/data

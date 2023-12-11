@@ -10,6 +10,9 @@ logger = logging.getLogger()
 
 # 필요한 경우 코드 다시 작성할 것
 
+def execute(config: Dict[str, Any]):
+    Simulation().simulate(config)
+
 
 class Simulation:
     def __init__(self, data_root_path: str) -> None:

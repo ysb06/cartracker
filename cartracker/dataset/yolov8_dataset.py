@@ -17,7 +17,7 @@ class RegionOfInterest:
         self,
         raw_image: np.ndarray,
         bounding_box: BoundingBox,
-        cv_options: Dict[str, Any] = {"color": (0, 0, 255), "thickness": 1},
+        cv_options: Dict[str, Any] = {"color": (0, 0, 255), "thickness": 2},
     ) -> None:
         self.raw_image = raw_image
         self.bounding_box = bounding_box
@@ -83,6 +83,9 @@ class VideoLoader:
         _, frame = self.current_video_capture.read()
 
         return frame
+    
+    def release(self):
+        self.current_video_capture.release()
 
 
 class SongdoDataset(Dataset):
@@ -144,4 +147,7 @@ class SongdoDataset(Dataset):
         item_rect = RegionOfInterest(frame, item.label_box)
         # 주의: get_cv_rect는 get_frame후에 불려져야 함.
 
-        return item_rect, frame
+        return item_rect, frame, item.label_name
+    
+    def release(self):
+        self.video_loader.release()

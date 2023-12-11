@@ -2,15 +2,13 @@ import importlib
 import logging
 import pprint
 
-import yaml
-
 from cartracker.util import load_config
 
 logger = logging.getLogger(__name__)
 
 
 def main():
-    config = load_config("./config.yaml")
+    config = load_config("./cartracker/config.yaml")
     mode_name = config["mode"]
     mode_config = config[mode_name]
 

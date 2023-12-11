@@ -95,6 +95,10 @@ class Frame:
         height = self.start_keyframe.height + height_change
 
         return BoundingBox((x1, y1), width=width, height=height)
+    
+    @property
+    def label_name(self) -> str:
+        return self.start_keyframe.info['label_name']
 
 
 @dataclass
