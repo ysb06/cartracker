@@ -1,0 +1,57 @@
+mode: trainer.yolo_vgg_trainer
+
+trainer:
+  yolo_vgg_trainer:
+    yolo:
+      training:
+        activated: false
+        model_path: ./models/yolov8n.pt
+        params:
+          data: coco128.yaml
+          epochs: 100
+          imgsz: 640
+          device: mps
+      test:
+        activated: false
+        model_path: ./runs/detect/train2/weights/best.pt
+        params:
+          # source: ./datasets/sc_videos/dataset/label_00_013_221005_092102_092135.webm
+          source: ./datasets/sc_videos/cctv_raws/20221005/013_20221005_090000_100000.avi
+          imgsz: 640
+          device: mps
+    vgg:
+      training:
+        activated: true
+        epochs: 3
+        dataset: 
+          path: ./datasets/sc_images
+          classes:
+            - SCIGC
+            - NR_SCIGC
+        dataloader:
+          params:
+            batch_size: 128
+            shuffle: true
+        model:
+          name: vgg16
+        criterion:
+          name: CrossEntropyLoss
+        optimizer:
+          name: AdamW
+          params:
+            lr: 0.001
+        seed: 19880618
+      validation:
+        dataloader:
+          params:
+            batch_size: 128
+      test:
+        activated: true
+        dataset: 
+          path: ./datasets/sc_images
+          classes:
+            - SCIGC
+            - NR_SCIGC
+        dataloader:
+          params:
+            batch_size: 128

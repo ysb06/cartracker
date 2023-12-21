@@ -134,6 +134,12 @@ dmypy.json
 datasets/*/**
 !datasets/*/README*
 
+# Outputs
+runs/
+models/
+model/
+wandb/
+
 # Other
 .DS_Store
 

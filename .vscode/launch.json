@@ -5,6 +5,14 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Run PC.YoloVgg",
+            "type": "python",
+            "request": "launch",
+            "module": "cartracker",
+            "console": "integratedTerminal",
+            "args": ["--config", "cartracker/trainer/yolo_vgg_trainer.yaml"]
+        },
+        {
             "name": "Run PyCartracker",
             "type": "python",
             "request": "launch",

@@ -1,12 +1,29 @@
-mode: trainer
+mode: trainer.yolo_vgg_trainer
 
 trainer:
-  name: yolo_vgg_trainer
-  
+  yolo_vgg_trainer:
+    yolo:
+      training:
+        activated: false
+        model_path: ./models/yolov8n.pt
+        params:
+          data: coco128.yaml
+          epochs: 100
+          imgsz: 640
+          device: mps
+      test:
+        activated: true
+        model_path: ./runs/detect/train/weights/best.pt
+        params:
+          # source: ./datasets/sc_videos/dataset/label_00_013_221005_092102_092135.webm
+          source: ./datasets/sc_videos/cctv_raws/20221005/013_20221005_090000_100000.avi
+          imgsz: 640
+          device: mps
+
 ros:
-  name: simulation
-  package: ros
-  data_path:
-    bags: /Users/sbyim/Workspace/Python/sck-sandbox/pycartracker/data/bags
-    cctv: /Users/sbyim/Workspace/Python/sck-sandbox/pycartracker/data/cctv/cctv_positions.xlsx
-    videos: /Users/sbyim/Workspace/Python/sck-cartracker/data
+  simulation:
+    package: ros
+    data_path:
+      bags: /Users/sbyim/Workspace/Python/sck-sandbox/pycartracker/data/bags
+      cctv: /Users/sbyim/Workspace/Python/sck-sandbox/pycartracker/data/cctv/cctv_positions.xlsx
+      videos: /Users/sbyim/Workspace/Python/sck-cartracker/data
