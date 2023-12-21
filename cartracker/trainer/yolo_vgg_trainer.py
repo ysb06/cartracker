@@ -107,9 +107,9 @@ class VggTrainer:
                 self.optimizer.step()
 
                 learning_loss += loss.item()
-                wandb.log({"Learning Loss": learning_loss})
                 if i % 2000 == 1999:
-                    print(f"[{epoch + 1}, {i + 1}] loss: {learning_loss}")
+                    print(f"[{epoch + 1}, {i + 1}] loss: {learning_loss / 2000:.4f}")
+                    wandb.log({"Learning Loss": learning_loss / 2000})
                     learning_loss = 0.0
 
             val_loss, val_acc = self.validate()
