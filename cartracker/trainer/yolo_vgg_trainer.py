@@ -18,7 +18,7 @@ from albumentations.pytorch import ToTensorV2
 
 
 from cartracker.dataset.sc_dataset import SCDataset, get_dataloaders
-from cartracker.util import seed
+from cartracker.util import seed, get_device_automatically
 
 YOLO_MODEL_PATH = "./models/y8v.pt"
 
@@ -46,12 +46,16 @@ def execute(config: Dict[str, Any]):
 class VggTrainer:
     def __init__(self, config: Dict[str, Any]) -> None:
         seed(config["seed"])
+        self.device = get_device_automatically()
         self.epochs = config["epochs"]
+
         self.model = models.vgg16(weights=VGG16_Weights.DEFAULT)
+        # Pretrained Model Path: /Users/sbyim/.cache/torch/hub/checkpoints/vgg16-397923af.pth
         self.model.classifier[6] = nn.Linear(
             self.model.classifier[6].in_features, len(config["dataset"]["classes"])
         )
-        # Pretrained Model Path: /Users/sbyim/.cache/torch/hub/checkpoints/vgg16-397923af.pth
+        self.model.to(self.device)
+
         self.criterion = nn.CrossEntropyLoss()
         self.optimizer = optim.AdamW(
             self.model.parameters(), **config["optimizer"]["params"]
@@ -67,7 +71,7 @@ class VggTrainer:
         )
         self.dataset = SCDataset(config["dataset"])
         (
-            self.training_dataloader,
+            self.training_loader,
             self.validation_loader,
             self.test_loader,
         ) = get_dataloaders(
@@ -77,7 +81,7 @@ class VggTrainer:
             training_config=config["dataloader"]["params"],
             training_transform=self.train_transform,
         )
-        # wandb.init(project=f"SCIGC YV Model VGG Training", config=config)
+        wandb.init(project=f"SCIGC YV Model VGG Training", config=config)
 
     def train(self):
         logger.info("Training...")
@@ -85,42 +89,61 @@ class VggTrainer:
         min_val_loss = np.inf
         for epoch in range(self.epochs):
             logger.info(f"Epoch: {epoch + 1} / {self.epochs}")
+
             self.model.train()
             learning_loss = 0.0
             for i, data in tqdm(
-                enumerate(self.training_dataloader), total=len(self.training_dataloader)
+                enumerate(self.training_loader), total=len(self.training_loader)
             ):
                 inputs, labels = data
+                inputs: torch.Tensor = inputs.to(self.device)
+                labels: torch.Tensor = labels.to(self.device)
                 self.optimizer.zero_grad()
 
                 outputs = self.model(inputs)
+
                 loss: torch.Tensor = self.criterion(outputs, labels)
                 loss.backward()
                 self.optimizer.step()
 
                 learning_loss += loss.item()
+                wandb.log({"Learning Loss": learning_loss})
                 if i % 2000 == 1999:
-                    print(f"[{epoch + 1}, {i + 1}] loss: {learning_loss / 2000:.3f}")
+                    print(f"[{epoch + 1}, {i + 1}] loss: {learning_loss}")
                     learning_loss = 0.0
-                # wandb.log({"Learning Loss": learning_loss})
-            val_loss, _ = self.validate()
+
+            val_loss, val_acc = self.validate()
+            wandb.log({"Valid Loss": val_loss, "Valid Accuracy": val_acc})
+
             if val_loss < min_val_loss:
                 state = {"model_state": self.model.state_dict()}
                 torch.save(state, f"./models/best_vgg.pt")
 
-        self.test()
+                text = f"Best Model Saved at Epoch {epoch + 1}"
+                wandb.log({"Message": text})
+                logger.info(text)
+
+        test_loss, test_acc = self.test()
+        text = f"Test Loss: {test_loss}, Test Accuracy: {test_acc}"
+        wandb.log({"Message": text})
+        wandb.finish()
 
     def validate(self):
+        logger.info("Validating...")
         self.model.eval()  # 모델을 평가 모드로 설정
         val_loss = 0.0
         correct = 0
         total = 0
 
         with torch.no_grad():  # 기울기 계산 비활성화
-            for data in self.validation_loader:
+            for data in tqdm(self.validation_loader, total=len(self.validation_loader)):
                 inputs, labels = data
-                outputs = self.model(inputs)
-                loss = self.criterion(outputs, labels)
+                inputs: torch.Tensor = inputs.to(self.device)
+                labels: torch.Tensor = labels.to(self.device)
+
+                outputs: torch.Tensor = self.model(inputs)
+
+                loss: torch.Tensor = self.criterion(outputs, labels)
                 val_loss += loss.item()
 
                 _, predicted = torch.max(outputs.data, 1)
@@ -136,16 +159,21 @@ class VggTrainer:
         return val_loss, val_accuracy
 
     def test(self):
+        logger.info("Testing...")
         self.model.eval()  # 모델을 평가 모드로 설정
         test_loss = 0.0
         correct = 0
         total = 0
 
         with torch.no_grad():  # 기울기 계산 비활성화
-            for data in self.test_loader:
+            for data in tqdm(self.test_loader, total=len(self.test_loader)):
                 inputs, labels = data
-                outputs = self.model(inputs)
-                loss = self.criterion(outputs, labels)
+                inputs: torch.Tensor = inputs.to(self.device)
+                labels: torch.Tensor = labels.to(self.device)
+
+                outputs: torch.Tensor = self.model(inputs)
+
+                loss: torch.Tensor = self.criterion(outputs, labels)
                 test_loss += loss.item()
 
                 _, predicted = torch.max(outputs.data, 1)

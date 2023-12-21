@@ -22,7 +22,7 @@ trainer:
     vgg:
       training:
         activated: true
-        epochs: 3
+        epochs: 100
         dataset: 
           path: ./datasets/sc_images
           classes:
