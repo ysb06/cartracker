@@ -82,6 +82,7 @@ class VggTrainer:
     def train(self):
         logger.info("Training...")
 
+        min_val_loss = np.inf
         for epoch in range(self.epochs):
             logger.info(f"Epoch: {epoch + 1} / {self.epochs}")
             self.model.train()
@@ -102,7 +103,11 @@ class VggTrainer:
                     print(f"[{epoch + 1}, {i + 1}] loss: {learning_loss / 2000:.3f}")
                     learning_loss = 0.0
                 # wandb.log({"Learning Loss": learning_loss})
-            self.validate()
+            val_loss, _ = self.validate()
+            if val_loss < min_val_loss:
+                state = {"model_state": self.model.state_dict()}
+                torch.save(state, f"./models/best_vgg.pt")
+
         self.test()
 
     def validate(self):
@@ -128,6 +133,8 @@ class VggTrainer:
             f"Validation Loss: {val_loss:.4f}, Validation Accuracy: {val_accuracy:.2f}%"
         )
 
+        return val_loss, val_accuracy
+
     def test(self):
         self.model.eval()  # 모델을 평가 모드로 설정
         test_loss = 0.0
@@ -148,6 +155,8 @@ class VggTrainer:
         test_loss /= len(self.test_loader)
         test_accuracy = 100 * correct / total
         print(f"Test Loss: {test_loss:.4f}, Test Accuracy: {test_accuracy:.2f}%")
+
+        return test_loss, test_accuracy
 
 
 class YoloTester:
