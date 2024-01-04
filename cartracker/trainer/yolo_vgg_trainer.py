@@ -9,7 +9,6 @@ import torch.nn as nn
 import torch.optim as optim
 import ultralytics
 import wandb
-from torch.utils.data import DataLoader
 from torchvision import models
 from torchvision.models import VGG16_Weights
 from tqdm import tqdm
