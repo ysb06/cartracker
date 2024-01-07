@@ -5,28 +5,17 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Run YoloVgg Tester",
+            "name": "Run YOLO Trainer",
             "type": "python",
             "request": "launch",
             "module": "cartracker",
             "console": "integratedTerminal",
-            "args": ["--config", "cartracker/tester/yolo_vgg_tester.yaml"]
-        },
-        {
-            "name": "Run PC.YoloVgg",
-            "type": "python",
-            "request": "launch",
-            "module": "cartracker",
-            "console": "integratedTerminal",
-            "args": ["--config", "cartracker/trainer/yolo_vgg_trainer.yaml"]
-        },
-        {
-            "name": "Run PyCartracker",
-            "type": "python",
-            "request": "launch",
-            "module": "cartracker",
-            "console": "integratedTerminal",
-            "justMyCode": false
+            "args": [
+                "--module",
+                "cartracker.trainer.yolo_trainer.trainer",
+                "--config",
+                "./cartracker/trainer/yolo_trainer/config.yaml"
+            ]
         },
         {
             "name": "Python: Current File",

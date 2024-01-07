@@ -5,6 +5,15 @@ from cartracker.dataset.yolov8_dataset import RegionOfInterest, SongdoDataset
 from torch.utils.data import DataLoader
 import cv2
 import numpy as np
+from pytrainer import Worker
+
+
+class YoloTrainer(Worker):
+    def __init__(self, config_path: str) -> None:
+        super().__init__(config_path)
+
+    def work(self) -> None:
+        print("I Work!")
 
 
 def execute(config: Dict[str, Any]):
@@ -21,7 +30,7 @@ class YOLOv8_Trainer:
     def __init__(self, config: Dict[str, Any]) -> None:
         self.dataset = SongdoDataset(**config["dataset"]["dataset_params"])
 
-        vfourcc = cv2.VideoWriter.fourcc(*'mp4v')
+        vfourcc = cv2.VideoWriter.fourcc(*"mp4v")
         vwriter = cv2.VideoWriter("output_1.mp4", vfourcc, 29.975, (320, 240))
 
         # for idx, (rect, frame) in enumerate(self.dataset):
@@ -29,7 +38,7 @@ class YOLOv8_Trainer:
         #     rect: RegionOfInterest = rect
         #     # image = rect.get_croped_image()
         #     # rs_image = cv2.resize(image, dsize=(320, 240), interpolation=cv2.INTER_CUBIC)
-            
+
         #     cv2.rectangle(frame, **rect.get_cv_rect())
         #     frame = frame[100:340, 400:720]
 
@@ -41,7 +50,7 @@ class YOLOv8_Trainer:
         #     print(idx)
         #     if idx == 400:
         #         break
-        
+
         vwriter.release()
         self.dataset.release()
         cv2.destroyAllWindows()
@@ -50,7 +59,6 @@ class YOLOv8_Trainer:
         self.dataloader = DataLoader(
             self.dataset, **config["dataset"]["dataloader_params"]
         )
-        self.model = YOLO('yolov8.yaml')
-        self.model.train(data='coco128.yaml', epochs=100, imgsz=640, device='mps')
+        self.model = YOLO("yolov8.yaml")
+        self.model.train(data="coco128.yaml", epochs=100, imgsz=640, device="mps")
         print("OK")
-
