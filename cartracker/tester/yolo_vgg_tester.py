@@ -29,6 +29,3 @@ def execute(config: Dict[str, Any]):
         
         cv2.imshow("Result", raw)
         cv2.waitKey(0)
-
-        
-

@@ -15,7 +15,8 @@
                 "cartracker.trainer.yolo_trainer.trainer",
                 "--config",
                 "./cartracker/trainer/yolo_trainer/config.yaml"
-            ]
+            ],
+            "justMyCode": false
         },
         {
             "name": "Python: Current File",

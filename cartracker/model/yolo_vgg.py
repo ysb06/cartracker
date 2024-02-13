@@ -1,16 +1,34 @@
-from typing import Any, Dict
 import logging
-import ultralytics
-import torch
-from torchvision.models import VGG16_Weights, vgg16
-import torch.nn as nn
-from ultralytics.engine.results import Boxes, Results
-import numpy as np
-import cv2
+from typing import Any, Dict
+
 import albumentations as A
+import cv2
+import numpy as np
+import torch
+import torch.nn as nn
+import ultralytics
 from albumentations.pytorch import ToTensorV2
+from box import Box
+from torchvision.models import VGG16_Weights, vgg16
+from ultralytics.engine.results import Boxes, Results
 
 logger = logging.getLogger(__name__)
+
+
+class YoloTrackingModel(nn.Module):
+    def __init__(self, config: Box) -> None:
+        super().__init__()
+        self.yolo_layer = ultralytics.YOLO(**config["yolo"])
+        self.yolo_layer.train(data='coco128.yaml')
+        self.vgg_layer = vgg16(weights=VGG16_Weights.DEFAULT)
+        self.vgg_layer.classifier[6] = nn.Linear(
+            self.vgg_layer.classifier[6].in_features, 2
+        )
+        self.yolo_layer.to(config["yolo"]["device"])
+        self.vgg_layer.to(config["vgg"]["device"])
+
+    def forward(self, x):
+        pass
 
 
 class YoloVggModel(nn.Module):

@@ -1,13 +1,17 @@
 import logging
 import os
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import cv2
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, Subset
 import numpy as np
+from ultralytics.utils import DEFAULT_CFG
 
 from cartracker.dataset.label_studio import Frame, KeyFrame, LSCFLabels, BoundingBox
 from cartracker.util import load_config
+from sklearn.model_selection import StratifiedKFold
+from ultralytics.data.base import BaseDataset
+from ultralytics.data import YOLODataset
 
 logger = logging.getLogger()
 
@@ -47,59 +51,40 @@ class RegionOfInterest:
 
 
 class VideoLoader:
-    def __init__(
-        self,
-        root_path: str,
-        filenames_with_id: Dict[int, str],
-        fixed_video_size: Optional[Tuple[int, int]] = None,
-    ) -> None:
+    def __init__(self, root_path: str, filenames_with_id: Dict[int, str]) -> None:
         self.root_path = root_path
         self.filename_dict = filenames_with_id
-        self.current_id = -1
-        self.current_video_capture: Optional[cv2.VideoCapture] = None
-        self.__video_size = None if fixed_video_size is None else fixed_video_size
 
-    @property
-    def video_size(self):
-        # 무조건 get_frame 이후에 불러와야 한다는 점이 문제. 본 기능을 get_frame에 포함하든지, 다른 설계방안을 찾을 것.
-        if self.__video_size is not None:
-            return self.__video_size
-        elif self.current_video_capture is not None:
-            width = self.current_video_capture.get(cv2.CAP_PROP_FRAME_WIDTH)
-            height = self.current_video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
-            return (width, height)
-        else:
-            logger.warning("Nothing is specified for this video loader")
-            return None
+        self.video_captures: Dict[int, cv2.VideoCapture] = {}
 
-    def get_frame(self, id: int, frame_number: int):
-        if id != self.current_id:
-            self.current_id = id
-            video_file_name = self.filename_dict[id]
-            video_file_path = os.path.join(self.root_path, video_file_name)
-            self.current_video_capture = cv2.VideoCapture(video_file_path)
+    def get_frame(self, task_id: int, frame_number: int):
+        if task_id not in self.video_captures:
+            video_file_path = os.path.join(self.root_path, self.filename_dict[task_id])
+            self.video_captures[task_id] = cv2.VideoCapture(video_file_path)
 
-        self.current_video_capture.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
-        _, frame = self.current_video_capture.read()
+        self.video_captures[task_id].set(cv2.CAP_PROP_POS_FRAMES, frame_number)
+        _, frame = self.video_captures[task_id].read()
 
         return frame
-    
+
     def release(self):
-        self.current_video_capture.release()
+        for cap in self.video_captures.values():
+            cap.release()
+        self.video_captures.clear()
 
 
 class SongdoDataset(Dataset):
-    def __init__(self, path: str, data_size: int = 0) -> None:
+    def __init__(self, path: str) -> None:
         self.dataset_path = path
         self.label_info = load_config(os.path.join(path, "info.yaml"))
         label_file_path = os.path.join(path, self.label_info["label_file_name"])
         self.raw_label = LSCFLabels(label_file_path)
         self.video_loader = VideoLoader(
-            path,
-            self.label_info["task_related_video_filename_list"],
-        )
+            os.path.join(path, self.label_info["train"]),
+            self.label_info["train_video_filename_list"],
+        )   # train만 사용하고 있음. 추후 test도 사용할 수 있도록 개발
 
-        self.keyframe_data = self.initialize_data()
+        self.frame_data = self.initialize_data()
 
     def initialize_data(self) -> List[Frame]:
         data = []
@@ -138,16 +123,44 @@ class SongdoDataset(Dataset):
         # 어떻게 효율적으로 무결성 있게 작성할지는 고민해 보자
         return data
 
-    def __len__(self):
-        return len(self.keyframe_data)
+    def stratified_split(
+        self,
+        n_splits=5,
+        shuffle=True,
+        random_state=42,
+        # split_level: Literal['frame', 'keyframe', 'task'] = 'frame'   # 추후 필요하면 개발
+    ) -> List[Tuple[Subset, Subset]]:
+        # Test 셋은 별도로 준비할 것
 
-    def __getitem__(self, index: int) -> Tuple[RegionOfInterest, np.ndarray]:
-        item = self.keyframe_data[index]
+        skf = StratifiedKFold(
+            n_splits=n_splits, shuffle=shuffle, random_state=random_state
+        )
+
+        # frame level
+        labels = [frame.label_name for frame in self.frame_data]
+        subsets = [
+            (Subset(self, train_idx), Subset(self, val_idx))
+            for train_idx, val_idx in skf.split(np.zeros(len(labels)), labels)
+        ]
+
+        return subsets
+
+    def __len__(self):
+        return len(self.frame_data)
+
+    def __getitem__(self, index: int) -> Tuple[RegionOfInterest, np.ndarray, str]:
+        item = self.frame_data[index]
         frame = self.video_loader.get_frame(item.task_id, item.frame_number)
         item_rect = RegionOfInterest(frame, item.label_box)
         # 주의: get_cv_rect는 get_frame후에 불려져야 함.
 
         return item_rect, frame, item.label_name
-    
+
     def release(self):
         self.video_loader.release()
+
+
+class SongdoBaseDataset(BaseDataset):
+    def __init__(self):
+        super().__init__()
+    

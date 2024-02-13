@@ -7,4 +7,4 @@ tester:
       vgg_path: ./models/best_vgg.pt
     
     test:
-      target_path: ./datasets/sc_videos/dataset/label_04_013_221005_095518_095539.webm
+      target_path: ./datasets/sc_videos/dataset/train/label_04_013_221005_095518_095539.webm

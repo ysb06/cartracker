@@ -1,2 +1,26 @@
-test:
-  __target__: torch
+wandb:
+  project: SCIGC Car Tracking Project
+
+dataset:
+  path: ./datasets/sc_videos/dataset
+
+dataset_split:
+  n_splits: 5
+  shuffle: True
+  random_state: 42
+
+training_loader:
+  batch_size: 64
+  shuffle: true
+
+validation_loader:
+  batch_size: 128
+  shuffle: true
+
+model:
+  yolo:
+    model: ./models/yolov8n.pt
+  vgg:
+    model: ./models/yolov8n.pt
+
+epochs: 100

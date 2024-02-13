@@ -1,23 +1,31 @@
-from typing import Any, Dict
-from ultralytics import YOLO
 import os
-from cartracker.dataset.yolov8_dataset import RegionOfInterest, SongdoDataset
-from torch.utils.data import DataLoader
+from typing import Any, Dict
+
 import cv2
 import numpy as np
+from torch.utils.data import DataLoader
+from ultralytics import YOLO
+
+from cartracker.dataset.yolov8_dataset import RegionOfInterest, SongdoDataset
+from cartracker.trainer.yolo_trainer.trainer import YoloTrackingModel
 from pytrainer import Worker
+
+
+def execute(config: Dict[str, Any]):
+    trainer = YoloTrainer(config)
 
 
 class YoloTrainer(Worker):
     def __init__(self, config_path: str) -> None:
         super().__init__(config_path)
+        self.dataset = SongdoDataset(**self.config["dataset"]["dataset_params"])
+        self.model = YoloTrackingModel(self.config["model"])
 
     def work(self) -> None:
         print("I Work!")
 
 
-def execute(config: Dict[str, Any]):
-    trainer = YOLOv8_Trainer(config)
+
 
 
 class DataPath:
