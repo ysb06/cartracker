@@ -1,0 +1,5 @@
+yolo_config:
+  model: ./models/yolov8n.pt
+vgg_config:
+  checkpoint: ./models/best_vgg.pt
+  out_features: 2

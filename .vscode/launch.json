@@ -5,8 +5,16 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Run v2 YOLO Trainer",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "cartracker_v2",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
             "name": "Run YOLO Trainer",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "module": "cartracker",
             "console": "integratedTerminal",
@@ -20,7 +28,7 @@
         },
         {
             "name": "Python: Current File",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",

@@ -1,0 +1,5 @@
+train:
+  path: ./datasets/sc_videos/dataset/train
+
+test:
+  path: ./datasets/sc_videos/dataset/test

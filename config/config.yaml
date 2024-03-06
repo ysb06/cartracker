@@ -1,0 +1,20 @@
+defaults:
+  - dataset: songdo
+  - model: yolovgg
+  - _self_
+  
+device: auto
+seed: 42
+
+training_loader:
+  batch_size: 64
+  shuffle: true
+validation_loader:
+  batch_size: 128
+  shuffle: false
+test_loader:
+  batch_size: 16
+  shuffle: false
+trainer:
+  max_epochs: 3
+  fast_dev_run: true

@@ -135,10 +135,11 @@ datasets/*/**
 !datasets/*/README*
 
 # Outputs
-runs/
-models/
-model/
-wandb/
+/runs
+/models
+/model
+/wandb
+/outputs
 
 # Other
 .DS_Store
