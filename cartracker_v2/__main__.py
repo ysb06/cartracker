@@ -67,7 +67,7 @@ def run(config: DictConfig) -> None:
     # trainer.predict(model, test_loader)
     print("Predicting Model...")
     for batch in tqdm(test_loader):
-        origs, plots, scigc_infos = model.test_forward(*batch)
+        origs, plots, scigc_infos = model.predict(*batch)
 
         for idx, (plot, scigc_info) in enumerate(zip(plots, scigc_infos)):
             plot = cv2.putText(

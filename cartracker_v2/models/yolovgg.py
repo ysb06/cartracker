@@ -82,39 +82,7 @@ class Yolovgg(L.LightningModule):
             ]
         )
 
-    def forward(
-        self,
-        x_input: Union[torch.Tensor, List[torch.Tensor]],
-        roi: Union[torch.Tensor, List[torch.Tensor]],
-        cropped_input: Union[torch.Tensor, List[torch.Tensor]],
-        label: Union[int, List[int]],
-    ) -> Tuple[List[np.ndarray], List[List[int]], torch.Tensor]:
-        yolo_results: List[Results] = self.yolo.predict(
-            x_input, conf=0.1, show_labels=False, show_conf=False
-        )
-
-        origs: List[np.ndarray] = []
-        xyxys: List[List[int]] = []
-        car_images: List[torch.Tensor] = []
-        for yolo_result in yolo_results:
-            orig: np.ndarray = yolo_result.orig_img
-            for box in yolo_result.boxes:
-                box: Boxes = box
-                xyxy: List[int] = box.xyxy.squeeze().round().int().tolist()
-                target: np.ndarray = orig[xyxy[1] : xyxy[3], xyxy[0] : xyxy[2]]
-                if box.cls == CAR_LABEL:
-                    origs.append(orig)
-                    xyxys.append(xyxy)
-                    car_images.append(self.vgg_transform(image=target)["image"])
-
-        if len(car_images) == 0:
-            return origs, xyxys, torch.tensor([])
-        else:
-            vgg_output: torch.Tensor = self.vgg_layer(torch.stack(car_images))
-
-            return origs, xyxys, vgg_output
-
-    def test_forward(
+    def predict(
         self,
         x_input: Union[torch.Tensor, List[torch.Tensor]],
         roi: Union[torch.Tensor, List[torch.Tensor]],
@@ -160,14 +128,6 @@ class Yolovgg(L.LightningModule):
                 scigc_car_info[cursor[0]][cursor[1]].append(torch.argmax(output).item())
 
         return origs, plots, scigc_car_info
-        # if len(car_idxs) != 0:
-        #     vgg_output: torch.Tensor = self.vgg_layer(torch.stack(car_images))
-        #     for idx, xyxy, output in zip(car_idxs, car_xyxys, vgg_output):
-        #         scigc_car_info[idx] = (xyxy, torch.argmax(output).item())
-
-        #     return origs, plots, scigc_car_info
-        # else:
-        #     return origs, plots, {}
 
     def configure_optimizers(self) -> Optimizer:
         optimizer = torch.optim.AdamW(self.vgg_layer.parameters(), lr=1e-3)
