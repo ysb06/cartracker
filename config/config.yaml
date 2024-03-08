@@ -9,12 +9,16 @@ seed: 42
 training_loader:
   batch_size: 64
   shuffle: true
+  num_workers: 9
+  persistent_workers: true
 validation_loader:
   batch_size: 128
   shuffle: false
+  num_workers: 9
+  persistent_workers: true
 test_loader:
   batch_size: 16
   shuffle: false
 trainer:
   max_epochs: 3
-  fast_dev_run: true
+  # fast_dev_run: true

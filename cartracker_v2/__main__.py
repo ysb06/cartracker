@@ -11,7 +11,12 @@ import cv2
 import torch
 
 import cartracker_v2.utils as utils
-from cartracker_v2.dataset.songdo_dataset import SongdoDataset, yolovgg_collate_fn, yolovgg_test_collate_fn
+from cartracker_v2.dataset.songdo_dataset import (
+    SongdoDataset,
+    yolovgg_collate_fn,
+    yolovgg_test_collate_fn,
+    yolovgg_train_collate_fn,
+)
 from cartracker_v2.models.yolovgg import Yolovgg
 from tqdm import tqdm
 
@@ -30,10 +35,14 @@ def run(config: DictConfig) -> None:
     test_dataset = SongdoDataset(**config["dataset"]["test"])
 
     training_loader = DataLoader(
-        training_dataset, collate_fn=yolovgg_collate_fn, **config["training_loader"]
+        training_dataset,
+        collate_fn=yolovgg_train_collate_fn,
+        **config["training_loader"],
     )
     validation_loader = DataLoader(
-        validation_dataset, collate_fn=yolovgg_collate_fn, **config["validation_loader"]
+        validation_dataset,
+        collate_fn=yolovgg_test_collate_fn,
+        **config["validation_loader"],
     )
     test_loader = DataLoader(
         test_dataset, collate_fn=yolovgg_test_collate_fn, **config["test_loader"]
@@ -46,7 +55,7 @@ def run(config: DictConfig) -> None:
 
     # trainer = L.Trainer(
     #     **config.trainer,
-    #     logger=True,
+    #     logger=False,
     #     accelerator=device.type,
     # )
     # trainer.fit(
@@ -54,29 +63,41 @@ def run(config: DictConfig) -> None:
     #     train_dataloaders=training_loader,
     #     val_dataloaders=validation_loader,
     # )
+
     # trainer.predict(model, test_loader)
     print("Predicting Model...")
     for batch in tqdm(test_loader):
-        origs, xyxys, predictions = model.forward(*batch)
+        origs, plots, scigc_infos = model.test_forward(*batch)
 
-        current_frame = None
-        visualized_image = None
-        for idx, (frame, xyxy, prediction) in enumerate(zip(origs, xyxys, predictions)):
-            label_index = torch.argmax(prediction).item()
-            if current_frame is not frame:
-                if current_frame is not None:
-                    cv2.imshow("Frame", visualized_image)
-                    cv2.waitKey(0)
-                current_frame = frame
-                visualized_image = frame.copy()
-            
-            color = (0, 0, 255) if label_index == 0 else (255, 0, 0)
-            visualized_image = cv2.rectangle(visualized_image, (xyxy[0], xyxy[1]), (xyxy[2], xyxy[3]), color, 5)
-
-            
-
-            
-    
+        for idx, (plot, scigc_info) in enumerate(zip(plots, scigc_infos)):
+            plot = cv2.putText(
+                plot,
+                f"Batch ID: {idx} / {len(plots) - 1}",
+                (0, 50),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                2,
+                (255, 0, 255),
+                5,
+            )
+            if len(scigc_info) != 0:
+                for xyxy, car_image, label in scigc_info:
+                    plot = cv2.rectangle(
+                        plot, (xyxy[0], xyxy[1]), (xyxy[2], xyxy[3]), (0, 0, 255), 5
+                    )
+                    plot = cv2.putText(
+                        plot,
+                        f"Label: {label}",
+                        (xyxy[0], xyxy[1] - 20),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        1,
+                        (0, 0, 255),
+                        5,
+                    )
+                cv2.imshow("Plot", plot)
+                cv2.waitKey(0)
+            else:
+                cv2.imshow("Plot", plot)
+                cv2.waitKey(1)
 
 
 if __name__ == "__main__":

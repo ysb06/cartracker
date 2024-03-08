@@ -1,5 +1,11 @@
 yolo_config:
-  model: ./models/yolov8n.pt
+  args:
+    model: ./models/yolov8n.pt
+    task: null
+  training_args:
+    data: coco128.yaml
+    epochs: 100
+  need_training: true
 vgg_config:
   checkpoint: ./models/best_vgg.pt
   out_features: 2

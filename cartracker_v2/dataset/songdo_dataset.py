@@ -170,6 +170,14 @@ class SongdoDataset(Dataset):
 
 
 # 차후에 collate_fn이 여러개 생길 경우 별도로 모듈을 만들어서 관리할 필요가 있음
+vgg_train_transform = A.Compose(
+    [
+        A.Resize(224, 224),
+        A.HorizontalFlip(),
+        A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ToTensorV2(),
+    ]
+)
 
 
 def yolovgg_collate_fn(batch: List[Tuple[RegionOfInterest, np.ndarray, str]]) -> Tuple:
@@ -178,29 +186,63 @@ def yolovgg_collate_fn(batch: List[Tuple[RegionOfInterest, np.ndarray, str]]) ->
     )  # YOLO 학습용
     rois = torch.stack([torch.Tensor(item[0].yyxx) for item in batch])  # YOLO 학습용
     # YOLO Label은 모두 Car로 동일 (Label Number: 2)
-    cropped_images = [
-        torch.Tensor(item[0].get_cropped_image()) for item in batch
-    ]  # VGG 학습용
-    labels = [0 if item[2] == "SCIGC" else 1 for item in batch]  # VGG 학습용
+    cropped_images = torch.stack(
+        [torch.Tensor(item[0].get_cropped_image()) for item in batch]
+    )  # VGG 학습용
+    labels = torch.stack(
+        [0 if item[2] == "SCIGC" else 1 for item in batch]
+    )  # VGG 학습용
     # SCIGC: 0
     # NR_SCIGC: 1
 
     return frames, rois, cropped_images, labels
 
 
-transform = A.Compose(
+yolo_test_transform = A.Compose(
     [
-        A.Resize(640, 640),
-        A.Normalize(mean=(0.0, 0.0, 0.0), std=(1.0, 1.0, 1.0)),
+        # A.Resize(640, 640),
+        # A.Normalize(mean=(0.0, 0.0, 0.0), std=(1.0, 1.0, 1.0)),
+        ToTensorV2(),
+    ]
+)
+vgg_test_transform = A.Compose(
+    [
+        A.Resize(224, 224),
+        A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ToTensorV2(),
     ]
 )
 
-def yolovgg_test_collate_fn(batch: List[Tuple[RegionOfInterest, np.ndarray, str]]) -> Tuple:
-    frames = torch.stack([transform(image=item[1])["image"] for item in batch])
-    rois = torch.stack([torch.Tensor(item[0].yyxx) for item in batch])  # YOLO 학습용
-    cropped_images = [
-        torch.Tensor(item[0].get_cropped_image()) for item in batch
-    ]  # VGG 학습용
-    labels = [0 if item[2] == "SCIGC" else 1 for item in batch]  # VGG 학습용
+
+def yolovgg_train_collate_fn(
+    batch: List[Tuple[RegionOfInterest, np.ndarray, str]]
+) -> Tuple:
+    frames = [item[1] for item in batch]
+    rois = [item[0].yyxx for item in batch]  # YOLO 학습용
+    cropped_images = torch.stack(
+        [
+            vgg_train_transform(image=item[0].get_cropped_image())["image"]
+            for item in batch
+        ]
+    )  # VGG 학습용
+    labels = torch.tensor(
+        [0 if item[2] == "SCIGC" else 1 for item in batch]
+    )  # VGG 학습용
+    return frames, rois, cropped_images, labels
+
+
+def yolovgg_test_collate_fn(
+    batch: List[Tuple[RegionOfInterest, np.ndarray, str]]
+) -> Tuple:
+    frames = [item[1] for item in batch]
+    rois = [item[0].yyxx for item in batch]  # YOLO 학습용
+    cropped_images = torch.stack(
+        [
+            vgg_test_transform(image=item[0].get_cropped_image())["image"]
+            for item in batch
+        ]
+    )  # VGG 학습용
+    labels = torch.tensor(
+        [0 if item[2] == "SCIGC" else 1 for item in batch]
+    )  # VGG 학습용
     return frames, rois, cropped_images, labels
