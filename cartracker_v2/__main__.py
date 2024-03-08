@@ -67,31 +67,19 @@ def run(config: DictConfig) -> None:
     # trainer.predict(model, test_loader)
     print("Predicting Model...")
     for batch in tqdm(test_loader):
-        origs, plots, scigc_infos = model.predict(*batch)
+        origs, plots, scigc_infos = model.predict(batch[0])
 
         for idx, (plot, scigc_info) in enumerate(zip(plots, scigc_infos)):
-            plot = cv2.putText(
-                plot,
-                f"Batch ID: {idx} / {len(plots) - 1}",
-                (0, 50),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                2,
-                (255, 0, 255),
-                5,
+            plot = utils.put_text(
+                plot, f"Batch ID: {idx} / {len(plots) - 1}", (0, 40), (255, 0, 255)
             )
             if len(scigc_info) != 0:
-                for xyxy, car_image, label in scigc_info:
+                for xyxy, label in scigc_info:
                     plot = cv2.rectangle(
                         plot, (xyxy[0], xyxy[1]), (xyxy[2], xyxy[3]), (0, 0, 255), 5
                     )
-                    plot = cv2.putText(
-                        plot,
-                        f"Label: {label}",
-                        (xyxy[0], xyxy[1] - 20),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        1,
-                        (0, 0, 255),
-                        5,
+                    plot = utils.put_text(
+                        plot, f"Label: {label}", (xyxy[0], xyxy[1] - 20), (0, 0, 255)
                     )
                 cv2.imshow("Plot", plot)
                 cv2.waitKey(0)

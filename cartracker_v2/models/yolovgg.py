@@ -83,12 +83,8 @@ class Yolovgg(L.LightningModule):
         )
 
     def predict(
-        self,
-        x_input: Union[torch.Tensor, List[torch.Tensor]],
-        roi: Union[torch.Tensor, List[torch.Tensor]],
-        cropped_input: Union[torch.Tensor, List[torch.Tensor]],
-        label: Union[int, List[int]],
-    ):
+        self, x_input: Union[torch.Tensor, List[torch.Tensor]]
+    ) -> Tuple[List[np.ndarray], List[np.ndarray], List[List[Tuple[List[int], int]]]]:
         yolo_results: List[Results] = self.yolo.predict(
             x_input, conf=0.5, verbose=False
         )
@@ -125,7 +121,11 @@ class Yolovgg(L.LightningModule):
             vgg_output: torch.Tensor = self.vgg_layer(torch.stack(car_images))
 
             for cursor, output in zip(cursors, vgg_output):
-                scigc_car_info[cursor[0]][cursor[1]].append(torch.argmax(output).item())
+                # scigc_car_info[cursor[0]][cursor[1]].append(torch.argmax(output).item())
+                scigc_car_info[cursor[0]][cursor[1]] = (
+                    scigc_car_info[cursor[0]][cursor[1]][0],
+                    torch.argmax(output).item(),
+                )
 
         return origs, plots, scigc_car_info
 
