@@ -10,7 +10,7 @@
             "request": "launch",
             "module": "cartracker_v2",
             "console": "integratedTerminal",
-            "justMyCode": false
+            "justMyCode": true
         },
         {
             "name": "Run YOLO Trainer",

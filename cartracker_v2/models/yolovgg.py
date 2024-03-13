@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Optional, Tuple, Union
 import os
+import logging
 
 import albumentations as A
 import cv2
@@ -22,20 +23,24 @@ IntInput = Union[int, List[int]]
 YoloOutput = Union[Results, List[Results]]
 InputBatch = Tuple[TensorInput, TensorInput, TensorInput, IntInput]
 
+logger = logging.getLogger()
+
 
 class VggLayer(nn.Module):
-    def __init__(self, checkpoint: Optional[str] = None, out_features: int = 2) -> None:
+    def __init__(self, checkpoint: Optional[Dict[str, str]] = None, out_features: int = 2) -> None:
         super().__init__()
+        best_path = checkpoint["best"] if checkpoint else None
         self.backbone_layer = vgg16(weights=VGG16_Weights.DEFAULT)
         self.backbone_layer.classifier[6] = nn.Linear(
             self.backbone_layer.classifier[6].in_features, out_features
         )
-        if os.path.exists(checkpoint):
-            states = torch.load(checkpoint, map_location=torch.device("cpu"))
+        if os.path.exists(best_path):
+            states = torch.load(best_path, map_location=torch.device("cpu"))
             try:
                 self.backbone_layer.load_state_dict(states["model_state"])
+                logger.info(f"Checkpoint {best_path} loaded")
             except KeyError:
-                print("Warning: Checkpoint is not loaded")
+                logger.warning("Warning: Checkpoint is not loaded")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.backbone_layer(x)
@@ -43,7 +48,11 @@ class VggLayer(nn.Module):
 
 
 class YoloModule:
-    def __init__(self, yolo_config: Dict[str, Any]) -> None:
+    def __init__(
+        self,
+        yolo_config: Dict[str, Any],
+        device: torch.device = torch.device("cpu"),
+    ) -> None:
         self.yolo_layer = ultralytics.YOLO(**yolo_config["args"])
         self.yolo_config = yolo_config
 
@@ -58,13 +67,20 @@ class YoloModule:
 
     def train(self):
         if self.yolo_config["need_training"]:
-            print("Training YOLO Model...")
+            logger.info("Training YOLO Model...")
             self.yolo_layer.train(**self.yolo_config["training_args"])
-            print("Training Complete")
+            logger.info("Training Complete")
+        else:
+            logger.info("YOLO Training Skipped")
 
 
 class Yolovgg(L.LightningModule):
-    def __init__(self, yolo_config: Dict[str, Any], vgg_config: Dict[str, Any]) -> None:
+    def __init__(
+        self,
+        yolo_config: Dict[str, Any],
+        vgg_config: Dict[str, Any],
+        device: torch.device = torch.device("cpu"),
+    ) -> None:
         super().__init__()
         self.yolo = YoloModule(yolo_config)
         self.vgg_layer = VggLayer(**vgg_config)
@@ -139,30 +155,41 @@ class Yolovgg(L.LightningModule):
     def training_step(self, batch: InputBatch, _):
         # batch is come from DataLoader with collate_fn in songdo_dataset.py
         # Todo: Yolo 모델을 1280x720 크기로 다시 학습 시키기, 해당 이미지 크기를 받을 수 있어야 한다.
-        yolo_x: torch.Tensor = batch[0]
-        roi: torch.Tensor = batch[1]
-        vgg_x: torch.Tensor = batch[2]
-        label: torch.Tensor = batch[3]
+        # yolo_x: torch.Tensor = batch[0]
+        # roi: torch.Tensor = batch[1]
+        vgg_xs: torch.Tensor = batch[2]
+        true_labels: torch.Tensor = batch[3]
 
         # YOLO 학습이 구현되어 있지 않음..Todo list
 
         # 현재는 VGG만 학습
-        vgg_result = self.vgg_layer(vgg_x)
-        loss = self.vgg_loss(vgg_result, label)
+        logits = self.vgg_layer(vgg_xs)
+        loss = self.vgg_loss(logits, true_labels)
+
+        self.log("train_loss", loss, on_epoch=False, on_step=True)
+
+        acc = (torch.argmax(logits, dim=1) == true_labels).float().mean().item()
 
         return loss
 
     def on_train_epoch_end(self) -> None:
-        return
-
-    def on_train_end(self) -> None:
-        torch.save(self.vgg_layer.state_dict(), self.vgg_config["checkpoint"])
+        torch.save(self.vgg_layer.state_dict(), self.vgg_config["checkpoint"]["last"])
 
     def validation_step(self, batch, _):
-        return
+        vgg_xs: torch.Tensor = batch[2]
+        true_labels: torch.Tensor = batch[3]
+
+        # YOLO 학습이 구현되어 있지 않음..Todo list
+
+        # 현재는 VGG만 학습
+        logits = self.vgg_layer(vgg_xs)
+        loss = self.vgg_loss(logits, true_labels)
+
+        self.log("valid_loss", loss, on_epoch=False, on_step=True)
+
+        acc = (torch.argmax(logits, dim=1) == true_labels).float().mean().item()
+
+        return loss
 
     def on_validation_epoch_end(self) -> None:
-        return
-
-    def predict_step(self, batch, _) -> Any:
-        return
+        torch.save(self.vgg_layer.state_dict(), self.vgg_config["checkpoint"]["best"])

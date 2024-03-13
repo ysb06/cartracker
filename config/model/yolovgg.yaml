@@ -5,7 +5,10 @@ yolo_config:
   training_args:
     data: coco128.yaml
     epochs: 100
+    imgsz: 1280
   need_training: true
 vgg_config:
-  checkpoint: ./models/best_vgg.pt
+  checkpoint:
+    last: ./models/last_vgg.pt
+    best: ./models/best_vgg.pt
   out_features: 2

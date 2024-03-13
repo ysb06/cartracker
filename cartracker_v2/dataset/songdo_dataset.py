@@ -158,10 +158,14 @@ class SongdoDataset(Dataset):
         return len(self.frame_data)
 
     def __getitem__(self, index: int) -> Tuple[RegionOfInterest, np.ndarray, str]:
-        item = self.frame_data[index]
-        frame = self.video_loader.get_frame(item.task_id, item.frame_number)
-        item_rect = RegionOfInterest(frame, item.label_box)
-        # 주의: get_cv_rect는 get_frame후에 불려져야 함.
+        try:
+            item = self.frame_data[index]
+            frame = self.video_loader.get_frame(item.task_id, item.frame_number)
+            item_rect = RegionOfInterest(frame, item.label_box)
+            # 주의: get_cv_rect는 get_frame후에 불려져야 함.
+        except KeyError:
+            logger.error(f"Task ID: {item.task_id} is not found in the video file")
+            raise Exception(f"Error: {item.task_id} is not found in the video file")
 
         return item_rect, frame, item.label_name
 
