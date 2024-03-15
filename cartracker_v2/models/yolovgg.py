@@ -43,7 +43,7 @@ class VggLayer(nn.Module):
                 logger.warning("Warning: Checkpoint is not loaded")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-d        x = self.backbone_layer(x)
+        x = self.backbone_layer(x)
         return x
 
 
