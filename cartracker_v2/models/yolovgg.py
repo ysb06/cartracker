@@ -43,7 +43,7 @@ class VggLayer(nn.Module):
                 logger.warning("Warning: Checkpoint is not loaded")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.backbone_layer(x)
+d        x = self.backbone_layer(x)
         return x
 
 
@@ -83,6 +83,7 @@ class Yolovgg(L.LightningModule):
     ) -> None:
         super().__init__()
         self.yolo = YoloModule(yolo_config)
+        self.yolo.train()
         self.vgg_layer = VggLayer(**vgg_config)
         self.vgg_config = vgg_config
 
@@ -97,6 +98,9 @@ class Yolovgg(L.LightningModule):
                 ToTensorV2(),
             ]
         )
+        self.val_min_acc = -1
+        self.val_acc = 0
+        self.val_steps = 0
 
     def predict(
         self, x_input: Union[torch.Tensor, List[torch.Tensor]]
@@ -149,9 +153,6 @@ class Yolovgg(L.LightningModule):
         optimizer = torch.optim.AdamW(self.vgg_layer.parameters(), lr=1e-3)
         return optimizer
 
-    def on_train_start(self) -> None:
-        self.yolo.train()
-
     def training_step(self, batch: InputBatch, _):
         # batch is come from DataLoader with collate_fn in songdo_dataset.py
         # Todo: Yolo 모델을 1280x720 크기로 다시 학습 시키기, 해당 이미지 크기를 받을 수 있어야 한다.
@@ -175,6 +176,10 @@ class Yolovgg(L.LightningModule):
     def on_train_epoch_end(self) -> None:
         torch.save(self.vgg_layer.state_dict(), self.vgg_config["checkpoint"]["last"])
 
+    def on_validation_epoch_start(self) -> None:
+        self.val_acc = 0
+        self.val_steps = 0
+
     def validation_step(self, batch, _):
         vgg_xs: torch.Tensor = batch[2]
         true_labels: torch.Tensor = batch[3]
@@ -185,11 +190,19 @@ class Yolovgg(L.LightningModule):
         logits = self.vgg_layer(vgg_xs)
         loss = self.vgg_loss(logits, true_labels)
 
-        self.log("valid_loss", loss, on_epoch=False, on_step=True)
-
         acc = (torch.argmax(logits, dim=1) == true_labels).float().mean().item()
+
+        self.log("valid_loss", loss, on_epoch=False, on_step=True)
+        self.log("valid_acc", acc, on_epoch=False, on_step=True)
+        self.val_acc += acc
+        self.val_steps += 1
 
         return loss
 
     def on_validation_epoch_end(self) -> None:
-        torch.save(self.vgg_layer.state_dict(), self.vgg_config["checkpoint"]["best"])
+        val_min_acc = self.val_acc / self.val_steps
+
+        if self.val_min_acc < val_min_acc:
+            self.val_min_acc = val_min_acc
+            torch.save(self.vgg_layer.state_dict(), self.vgg_config["checkpoint"]["best"])
+            logger.info(f"Best Model Saved at {self.vgg_config['checkpoint']['best']} with {val_min_acc} acc.")

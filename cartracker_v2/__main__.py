@@ -31,6 +31,10 @@ def run(config: DictConfig) -> None:
     device = utils.get_torch_device(config.device)
     L.seed_everything(config.seed)
 
+    logger.info("Model Loading...")
+    model = Yolovgg(**config["model"])
+
+    logger.info("Dataset Loading...")
     dataset = SongdoDataset(**config["dataset"]["train"])
     training_dataset, validation_dataset = dataset.stratified_split()[0]
     test_dataset = SongdoDataset(**config["dataset"]["test"])
@@ -48,30 +52,30 @@ def run(config: DictConfig) -> None:
     test_loader = DataLoader(
         test_dataset, collate_fn=yolovgg_test_collate_fn, **config["test_loader"]
     )
-
-    model = Yolovgg(**config["model"])
+    logger.info("Dataset Loading Complete")
 
     run_name = f"CartrackerL_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    # wandb_logger = WandbLogger(name=run_name, project="SCK_Cartracker")
-    # wandb_logger.experiment.config.update(OmegaConf.to_container(config, resolve=True))
+    wandb_logger = WandbLogger(name=run_name, project="SCK_Cartracker")
+    wandb_logger.experiment.config.update(OmegaConf.to_container(config, resolve=True))
 
-    # trainer = L.Trainer(
-    #     **config.trainer,
-    #     logger=wandb_logger,
-    #     accelerator=device.type,
-    #     profiler="advanced",
-    #     log_every_n_steps=len(training_loader) // 10,
-    # )
-    # trainer.fit(
-    #     model,
-    #     train_dataloaders=training_loader,
-    #     val_dataloaders=validation_loader,
-    # )
+    trainer = L.Trainer(
+        **config.trainer,
+        logger=wandb_logger,
+        accelerator=device.type,
+        profiler="advanced",
+        log_every_n_steps=len(training_loader) // 10,
+    )
 
-    # logger.info("Training Complete")
+    logger.info("Training...")
+    trainer.fit(
+        model,
+        train_dataloaders=training_loader,
+        val_dataloaders=validation_loader,
+    )
+    logger.info("Training Complete")
 
     print("Predicting Model...")
-    fourcc = cv2.VideoWriter.fourcc(*"x264")
+    fourcc = cv2.VideoWriter.fourcc(*"mp4v")
     video_writer = cv2.VideoWriter(
         f"./outputs/output_{run_name}.avi", fourcc, 29.97, (1280, 720)
     )
