@@ -1,0 +1,14 @@
+yolo_config:
+  args:
+    model: ./models/yolov8n_960.pt
+    task: null
+  training_args:
+    data: coco128.yaml
+    epochs: 100
+    imgsz: 960
+  need_training: false
+vgg_config:
+  checkpoint:
+    last: ./models/last_vgg.pt
+    best: ./models/best_vgg.pt
+  out_features: 2

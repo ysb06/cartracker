@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Dict, List, Tuple
 
 import albumentations as A
 from albumentations.pytorch import ToTensorV2

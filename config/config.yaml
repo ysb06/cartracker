@@ -1,6 +1,6 @@
 defaults:
   - dataset: songdo
-  - model: yolovgg
+  - model: yolovgg_960
   - _self_
   
 device: auto
