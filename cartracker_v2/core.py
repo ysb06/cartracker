@@ -18,6 +18,28 @@ from cartracker_v2.dataset.songdo_dataset import (
     yolovgg_train_collate_fn,
 )
 from cartracker_v2.models.yolovgg import Yolovgg
+import logging
+
+logger = logging.getLogger()
+
+
+def run(config: DictConfig) -> None:
+    L.seed_everything(config.seed)
+    training_loader, validation_loader, test_loader = get_dataloaders(config)
+    model = Yolovgg(**config["model"])
+    trainer = get_trainer(config)
+
+    # trainer.fit(
+    #     model,
+    #     train_dataloaders=training_loader,
+    #     val_dataloaders=validation_loader,
+    # )
+    training_loader.dataset.dataset.release()
+    logger.info("Training Complete")
+
+    print("Predicting Model...")
+    run_simple_perdiction(trainer.logger.name, model, test_loader)
+    print("Prediction Complete")
 
 
 def get_dataloaders(config: DictConfig):
@@ -41,6 +63,7 @@ def get_dataloaders(config: DictConfig):
 
     return training_loader, validation_loader, test_loader
 
+
 def get_trainer(config: DictConfig, logger: str = "wandb"):
     device = utils.get_torch_device(config.device)
 
@@ -57,8 +80,10 @@ def get_trainer(config: DictConfig, logger: str = "wandb"):
 
     return trainer
 
+
 def get_simple_prediction(model: Yolovgg, batch):
     return model.predict(batch[0])
+
 
 def get_advanced_prediction(model: Yolovgg, batch):
     return model.predict(batch[0])

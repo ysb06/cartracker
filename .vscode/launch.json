@@ -13,18 +13,12 @@
             "justMyCode": true
         },
         {
-            "name": "Run YOLO Trainer",
+            "name": "Run v2 YOLO Tracking",
             "type": "debugpy",
             "request": "launch",
-            "module": "cartracker",
+            "module": "cartracker_v2",
             "console": "integratedTerminal",
-            "args": [
-                "--module",
-                "cartracker.trainer.yolo_trainer.trainer",
-                "--config",
-                "./cartracker/trainer/yolo_trainer/config.yaml"
-            ],
-            "justMyCode": false
+            "justMyCode": true
         },
         {
             "name": "Python: Current File",
