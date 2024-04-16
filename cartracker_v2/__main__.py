@@ -19,7 +19,9 @@ CONFIG_BASE_PATH = Path(__file__).parent / ".." / "config"
 )
 def run(config: DictConfig) -> None:
     if "tracking" in config:
-        module = importlib.import_module(f".{config.tracking.name}", package="cartracker_v2.tracker")
+        module = importlib.import_module(
+            f".{config.tracking.name}", package="cartracker_v2.tracker"
+        )
         module.Tracker(config.tracking).run()
 
 
