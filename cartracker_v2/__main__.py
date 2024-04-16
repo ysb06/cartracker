@@ -4,28 +4,23 @@ from pathlib import Path
 import hydra
 from omegaconf import DictConfig
 
+import importlib
+
 
 logger = logging.getLogger()
 
-CONFIG_BASE_PATH = Path(__file__).parent / "config"
-TRAINING_CONFIG = CONFIG_BASE_PATH / "training"
-TRACKING_CONFIG = CONFIG_BASE_PATH / "tracking"
+CONFIG_BASE_PATH = Path(__file__).parent / ".." / "config"
 
 
 @hydra.main(
     version_base=None,
-    config_path=TRAINING_CONFIG.as_posix(),
+    config_path=CONFIG_BASE_PATH.as_posix(),
     config_name="config",
 )
 def run(config: DictConfig) -> None:
-    pass
+    if "tracking" in config:
+        module = importlib.import_module(f".{config.tracking.name}", package="cartracker_v2.tracker")
+        module.Tracker(config.tracking).run()
 
 
-@hydra.main(
-    version_base=None,
-    config_path=TRACKING_CONFIG.as_posix(),
-    config_name="config",
-)
-def run_tracker(config: DictConfig) -> None:
-    logger.info("Tracking Started")
-    print(config)
+run()

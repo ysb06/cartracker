@@ -1,0 +1,5 @@
+name: simple_tracker
+yolo:
+  model: ./models/yolov8n_960.pt
+dataset:
+  path: ./datasets/sc_videos/dataset/

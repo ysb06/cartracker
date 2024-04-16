@@ -1,0 +1,6 @@
+defaults:
+  - tracking: base
+  - _self_
+  
+device: auto
+seed: 42
