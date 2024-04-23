@@ -13,6 +13,14 @@
             "justMyCode": true
         },
         {
+            "name": "Run v2 Tracking Test",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/tracking_test.py",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
             "name": "Python: Current File",
             "type": "debugpy",
             "request": "launch",

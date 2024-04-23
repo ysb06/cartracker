@@ -22,7 +22,8 @@ def run(config: DictConfig) -> None:
         module = importlib.import_module(
             f".{config.tracking.name}", package="cartracker_v2.tracker"
         )
-        module.Tracker(config.tracking).run()
+        tracker = module.Tracker(config.tracking)
+        tracker.run()
 
 
 run()

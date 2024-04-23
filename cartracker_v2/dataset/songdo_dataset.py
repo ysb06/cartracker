@@ -130,6 +130,8 @@ class SongdoDataset(Dataset):
                 prev_keyframe = current_keyframe
                 prev_keyframe_num = label_idx[3]
         # 어떻게 효율적으로 무결성 있게 작성할지는 고민해 보자
+        # 특정 비디오만 추출하려고 하는 중, 하나의 비디오는 연속된 인덱스를 가지고 있음을 확인
+        # Todo: 추후 특정 비디오만 추출하는 기능을 추가할 것. 단 OpenCV에서 set Frame이 효율적인지 검토 필요
         return data
 
     def stratified_split(
