@@ -1,0 +1,29 @@
+[project]
+name = "sck-cartracker"
+version = "0.1.0"
+description = "Default template for PDM package"
+authors = [
+    {name = "Seungbin Yim", email = "ysb06@hotmail.com"},
+]
+dependencies = [
+    "ultralytics",
+    "albumentations",
+    "wandb",
+    "python-box",
+    "hydra-core",
+    "lightning",
+    "scikit-learn",
+    "seaborn",
+    "openpyxl",
+]
+requires-python = ">=3.11"
+readme = "README.md"
+license = {text = "MIT"}
+
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+[tool.pdm]
+distribution = true

@@ -294,7 +294,7 @@ class Tracker:
             while idx < len(self.test_dataset):
                 frame_info = self.test_dataset.frame_data[idx]
 
-                if frame_info.task_id == 2:  # 2번 SAMPLE만 추출
+                if frame_info.task_id == 2:  # 2번 SAMPLE 비디오에 대해서만 추출
                     if idx > 1362 and idx < 1794:
                         frame_mat = self.test_dataset.video_loader.get_frame(
                             frame_info.task_id, frame_info.frame_number
