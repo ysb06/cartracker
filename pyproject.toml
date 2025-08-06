@@ -5,25 +5,11 @@ description = "Default template for PDM package"
 authors = [
     {name = "Seungbin Yim", email = "ysb06@hotmail.com"},
 ]
-dependencies = [
-    "ultralytics",
-    "albumentations",
-    "wandb",
-    "python-box",
-    "hydra-core",
-    "lightning",
-    "scikit-learn",
-    "seaborn",
-    "openpyxl",
-]
-requires-python = ">=3.11"
+dependencies = ["opencv-python>=4.12.0.88", "bagpy>=0.5", "tqdm>=4.67.1", "rfdetr>=1.2.1"]
+requires-python = "==3.11.*"
 readme = "README.md"
 license = {text = "MIT"}
 
-[build-system]
-requires = ["setuptools>=61", "wheel"]
-build-backend = "setuptools.build_meta"
-
 
 [tool.pdm]
-distribution = true
+distribution = false

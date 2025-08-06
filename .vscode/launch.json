@@ -5,28 +5,20 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Run v2 YOLO Trainer",
-            "type": "debugpy",
-            "request": "launch",
-            "module": "cartracker_v2",
-            "console": "integratedTerminal",
-            "justMyCode": true
-        },
-        {
-            "name": "Run v2 Tracking Test",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/tracking_test.py",
-            "console": "integratedTerminal",
-            "justMyCode": true
-        },
-        {
             "name": "Python: Current File",
             "type": "debugpy",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": true
+        },
+        {
+            "name": "Run Project",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "scart",
+            "console": "integratedTerminal",
+            "justMyCode": false,
         }
     ]
 }

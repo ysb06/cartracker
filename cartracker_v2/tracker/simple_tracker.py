@@ -130,7 +130,7 @@ class SimpleModel:
 
         imgsz: Tuple[int, int] = imgsz if imgsz is not None else images[0].shape[:2]
         yolo_results: List[Results] = self.yolo_model.predict(
-            images, conf=conf, imgsz=imgsz, verbose=False, device="mps"
+            images, conf=conf, imgsz=imgsz, verbose=False, device="cpu"
         )
 
         result: List[Prediction] = []

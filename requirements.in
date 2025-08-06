@@ -1,9 +1,0 @@
-ultralytics
-albumentations
-wandb
-python-box
-hydra-core
-lightning
-scikit-learn
-seaborn
-openpyxl
